@@ -8,7 +8,6 @@
 | `src/features.py`、`src/train.py` | 特徵規則、訓練、評估、匯出 |
 | `templates/*.html` | 兩個工具的畫面範本（模型置換點 `/*__MODEL__*/null`） |
 | `dist/*.html` | **交付成品**，雙擊即可離線使用 |
-| `Dockerfile`、`deploy/` | Railway 部署設定（nginx 提供 `dist/` 與首頁） |
 | `09-啟動說明書.md` | 使用、安裝、訓練、測試與常見問題的完整步驟 |
 | `models/`、`reports/` | 模型 JSON、評估報告、測試證據 |
 | `tests/` | pytest 加上 Node 測試（直接測 dist 成品） |

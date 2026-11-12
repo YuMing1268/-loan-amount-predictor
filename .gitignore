@@ -9,3 +9,6 @@ regression8.csv
 # Python / pytest 快取
 __pycache__/
 .pytest_cache/
+
+# prepare_for_SDD 內的 HTML 副本（不上傳）
+prepare_for_SDD/*.html

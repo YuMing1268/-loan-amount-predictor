@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>撥貸金額預測工具</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2433;--mu:#667085;--bd:#e2e5ea;--ac:#2f6fed;--hi:#16794c;--md:#8a6a00;--lo:#b54708;--hib:#e3f4ea;--mdb:#fbf3d4;--lob:#fdf0e1;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171c;--card:#1d222a;--tx:#e8ebf0;--mu:#9aa3b2;--bd:#2d343f;--ac:#6b9bff;--hi:#5fd09a;--md:#e6c75c;--lo:#f0a35e;--hib:#16372a;--mdb:#3a3314;--lob:#3b2a14}}
+:root[data-theme="dark"]{--bg:#14171c;--card:#1d222a;--tx:#e8ebf0;--mu:#9aa3b2;--bd:#2d343f;--ac:#6b9bff;--hi:#5fd09a;--md:#e6c75c;--lo:#f0a35e;--hib:#16372a;--mdb:#3a3314;--lob:#3b2a14}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 18px;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+.card h2{font-size:14px;margin:0 0 12px;color:var(--mu);font-weight:600}
+label{display:block;font-size:13px;margin:10px 0 4px}
+select,input[type=number]{width:100%;padding:9px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+input[type=file]{width:100%;font:inherit;color:var(--mu)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{margin-top:14px;padding:9px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;cursor:pointer}
+button.g{background:transparent;color:var(--mu);border:1px solid var(--bd);margin-left:8px}
+.big{font-size:40px;font-weight:700;line-height:1.1}.unit{font-size:14px;color:var(--mu);font-weight:400;margin-left:4px}
+.tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:600;margin-left:8px;vertical-align:middle}
+.t高{background:var(--hib);color:var(--hi)}.t中{background:var(--mdb);color:var(--md)}.t低{background:var(--lob);color:var(--lo)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:14px 0 0;font-size:13px}.kv span:nth-child(odd){color:var(--mu)}
+.tw{overflow-x:auto;margin-top:12px}table{border-collapse:collapse;font-size:13px;white-space:nowrap}th,td{padding:5px 10px;border-bottom:1px solid var(--bd);text-align:left}
+.msg{font-size:13px;margin-top:10px}.err{color:var(--lo)}.warn{color:var(--lo);font-size:12px;margin-top:10px}
+.note{color:var(--mu);font-size:12px;margin-top:6px}
+.numerr{color:#c0392b;font-size:13px;margin-top:10px}
+</style></head><body><main>
+<h1>撥貸金額預測工具</h1>
+<p class="sub" id="sub"></p>
+<div class="grid">
+<div class="card"><h2>單筆輸入（KYC 後）</h2><div id="form"></div>
+<button id="go">預測</button><button class="g" id="reset">範例／重設</button></div>
+<div class="card"><h2>預測結果</h2><div id="out"><span class="sub">請輸入條件後按「預測」。</span></div></div>
+</div>
+<div class="card"><h2>批次預測（每日名單上傳 CSV）</h2>
+<input type="file" id="file" accept=".csv,text/csv">
+<p class="note">欄位名稱需與訓練資料相同（可不含「撥貸金額」）。支援 UTF-8 與 Big5 編碼。</p>
+<div id="bmsg" class="msg"></div><div class="tw" id="btab"></div>
+<button id="dl" style="display:none">下載預測結果 CSV</button></div>
+<p class="note">預測值為依歷史資料推估的參考額度，供與主管討論行銷細節使用；實際撥貸仍取決於收入、徵信與風險政策。金額單位沿用原資料（假設為萬元）。</p>
+</main>
+<script>
+const M=/*__MODEL__*/null;
+const CATS={
+ "行業":{opts:["行業屬性A","行業屬性B","行業屬性C","行業屬性D","行業屬性E"],unk:"行業_未知"},
+ "學歷":{opts:["高中","專科","大學","碩士","博士"],unk:"學歷_未知"},
+ "居住":{opts:["住本人資產無貸款","住本人資產有貸款","住公司宿舍","住租賃","住親戚產業"],unk:"居住_未知"},
+ "婚姻":{opts:["婚姻未婚","婚姻已婚","婚姻已婚無子女","婚姻已婚有子女","婚姻其他"],unk:"婚姻_未知"}};
+const MAXV={DBR:22};const NUM=[["循環比","循環比（%）"],["信用卡循環金額","信用卡循環金額"],["無擔保總餘額","無擔保總餘額"],["預借現金次數","預借現金次數"],["信用貸款含現金卡家數","信用貸款含現金卡家數"],["DBR","DBR"]];
+const ADD=["預測撥貸金額","預測等級","預測高低"];
+
+/* ---- 純函式（無 DOM，可由 node 測試；與 src/features.py 一致） ---- */
+function toFeat(rec){const f={};M.cols.forEach(c=>f[c]=0);
+ for(const g in CATS){let hit=false;CATS[g].opts.forEach(o=>{if(parseFloat(rec[o])===1){f[o]=1;hit=true}});if(!hit)f[CATS[g].unk]=1}
+ NUM.forEach(([k])=>f[k]=parseFloat(rec[k])||0);
+ f["無擔保總餘額"]=Math.max(0,f["無擔保總餘額"]);f["DBR_為0"]=f["DBR"]===0?1:0;
+ f["DBR"]=Math.min(Math.max(f["DBR"],M.dbr[0]),M.dbr[1]);return f}
+function warnings(rec){const w=[],d=parseFloat(rec["DBR"])||0,u=parseFloat(rec["無擔保總餘額"])||0;
+ if(d!==0&&(d<M.dbr[0]||d>M.dbr[1]))w.push(`DBR ${d} 超出訓練範圍，已截斷至 ${Math.min(Math.max(d,M.dbr[0]),M.dbr[1])}`);
+ if(u<0)w.push("無擔保總餘額為負值，已視為 0");return w}
+function predict(rec){const f=toFeat(rec),x=M.cols.map(c=>f[c]);let s=M.base;
+ for(const T of M.trees){let i=0;while(T.f[i]>=0)i=x[T.f[i]]<=T.t[i]?T.l[i]:T.r[i];s+=T.v[i]}
+ return Math.max(0,M.log?Math.expm1(s):s)}
+const lvl=a=>a<=M.cut[0]?"低":a<=M.cut[1]?"中":"高";
+const r1=x=>Math.round(x*10)/10;
+function parseCSV(t){const R=[];let r=[],c="",q=false;t=t.replace(/^﻿/,"");
+ for(let i=0;i<t.length;i++){const ch=t[i];
+  if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}
+  else if(ch=='"')q=true;else if(ch==","){r.push(c);c=""}
+  else if(ch=="\n"||ch=="\r"){if(ch=="\r"&&t[i+1]=="\n")i++;r.push(c);c="";if(r.length>1||r[0]!=="")R.push(r);r=[]}
+  else c+=ch}
+ if(c!==""||r.length){r.push(c);R.push(r)}return R}
+function batchPredict(txt){const R=parseCSV(txt);if(R.length<2)return{error:"檔案沒有資料列。"};
+ const H=R[0].map(s=>s.trim()),need=NUM.map(n=>n[0]).filter(k=>!H.includes(k));
+ if(need.length)return{error:"缺少欄位："+need.join("、")};
+ const rows=R.slice(1).map(r=>{const o={};H.forEach((k,i)=>o[k]=r[i]);return o});
+ const res=rows.map(o=>{const a=predict(o);return[r1(a),lvl(a),a>M.median?"高":"低"]});
+ const esc=v=>/[",\r\n]/.test(String(v))?`"${String(v).replace(/"/g,'""')}"`:v;
+ const csv="﻿"+[H.concat(ADD)].concat(R.slice(1).map((r,i)=>H.map((_,j)=>r[j]??"").concat(res[i]))).map(r=>r.map(esc).join(",")).join("\r\n");
+ const cnt={低:0,中:0,高:0};res.forEach(x=>cnt[x[1]]++);
+ const mae=H.includes("撥貸金額")?rows.reduce((s,o,i)=>s+Math.abs((parseFloat(o["撥貸金額"])||0)-res[i][0]),0)/rows.length:null;
+ const neg=rows.map((o,i)=>NUM.some(([k])=>{const v=parseFloat(o[k]);return v<0||v>(MAXV[k]??Infinity)})?i+2:0).filter(Boolean);
+ return{H,rows,res,csv,cnt,mae,neg}}
+function outName(d){const p=n=>String(n).padStart(2,"0");return`預測結果_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}.csv`}
+function decode(buf){try{return new TextDecoder("utf-8",{fatal:true}).decode(buf)}catch(_){return new TextDecoder("big5").decode(buf)}}
+if(typeof module!=="undefined")module.exports={M,CATS,NUM,toFeat,warnings,predict,lvl,parseCSV,batchPredict,outName,decode};
+
+/* ---- 畫面 ---- */
+if(typeof document!=="undefined"){
+const $=id=>document.getElementById(id);
+$("sub").textContent=`模型：HistGradientBoosting（訓練資料 ${M.n.toLocaleString()} 筆，${M.trained_at||""} 訓練）。可單筆輸入，或上傳 CSV 批次預測。資料只在你的瀏覽器內計算，不會上傳。`;
+let h="";for(const g in CATS)h+=`<label for="c_${g}">${g}屬性</label><select id="c_${g}"><option value="">未知／未填</option>`+CATS[g].opts.map(o=>`<option>${o}</option>`).join("")+"</select>";
+h+='<div class="row2">'+NUM.map(([k,t])=>`<div><label for="n_${k}">${t}</label><input id="n_${k}" type="number" min="0"${k in MAXV?` max="${MAXV[k]}"`:""} step="any" value="0"></div>`).join("")+"</div>";
+$("form").innerHTML=h;
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+function formRec(){const r={};for(const g in CATS){const v=$("c_"+g).value;if(v)r[v]=1}NUM.forEach(([k])=>r[k]=$("n_"+k).value);return r}
+function run(){const rec=formRec(),a=predict(rec),L=lvl(a),w=warnings(rec);
+ $("out").innerHTML=`<div class="big">${r1(a)}<span class="unit">預測撥貸金額</span></div>
+ <div style="margin-top:10px"><span class="tag t${L}">等級：${L}</span><span class="tag t${a>M.median?"高":"低"}">${a>M.median?"高於":"不高於"}中位數 ${M.median}</span></div>
+ <div class="kv"><span>等級切點</span><span>低 ≤ ${r1(M.cut[0])} &lt; 中 ≤ ${r1(M.cut[1])} &lt; 高</span></div>`+
+ (w.length?`<div class="warn">${w.map(esc).join("<br>")}</div>`:"")}
+function badNum(){const m=[];NUM.forEach(([k,t])=>{const e=$("n_"+k),v=parseFloat(e.value),b=v<0||v>(MAXV[k]??Infinity);e.style.borderColor=b?"#c0392b":"";e.style.background=b?"rgba(192,57,43,.08)":"";if(v<0)m.push(`${t} 不得小於 0`);else if(b)m.push(`${t} 不得大於 ${MAXV[k]}`)});return m}
+function safeRun(){const bad=badNum();if(bad.length){$("out").innerHTML=`<div class="numerr">${bad.join("；")}，請修正後再計算。</div>`;return}run()}
+$("go").onclick=safeRun;$("form").oninput=badNum;
+$("reset").onclick=()=>{for(const g in CATS)$("c_"+g).value=g=="行業"?"行業屬性C":"";NUM.forEach(([k])=>$("n_"+k).value=({DBR:12,無擔保總餘額:20,循環比:10})[k]||0);safeRun()};
+let outCSV="";
+$("file").onchange=async e=>{const file=e.target.files[0];if(!file)return;$("btab").innerHTML="";$("dl").style.display="none";$("bmsg").innerHTML="";
+ const B=batchPredict(decode(await file.arrayBuffer()));if(B.error){$("bmsg").innerHTML=`<span class="err">${esc(B.error)}</span>`;return}
+ outCSV=B.csv;
+ $("bmsg").textContent=`已預測 ${B.res.length.toLocaleString()} 筆　等級分布：低 ${B.cnt.低}／中 ${B.cnt.中}／高 ${B.cnt.高}`+(B.mae!==null?`　MAE = ${r1(B.mae)}`:"")+(B.neg.length?`
+⚠ 有 ${B.neg.length} 筆數值超出範圍（第 ${B.neg.slice(0,10).join("、")}${B.neg.length>10?"…":""} 列）：數值欄位不得小於 0，DBR 不得大於 22，請修正來源資料。`:"");
+ $("bmsg").style.whiteSpace="pre-line";
+ const show=["撥貸金額"].filter(k=>B.H.includes(k)).concat(["DBR","無擔保總餘額"]);
+ $("btab").innerHTML="<table><tr>"+show.concat(ADD).map(k=>`<th>${esc(k)}</th>`).join("")+"</tr>"+B.rows.slice(0,30).map((o,i)=>"<tr>"+show.map(k=>`<td>${esc(o[k])}</td>`).join("")+B.res[i].map(v=>`<td>${esc(v)}</td>`).join("")+"</tr>").join("")+"</table>"+(B.rows.length>30?'<p class="note">僅顯示前 30 筆，完整結果請下載。</p>':"");
+ $("dl").style.display="inline-block"};
+$("dl").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([outCSV],{type:"text/csv;charset=utf-8"}));a.download=outName(new Date());a.click()};
+}
+</script></body></html>

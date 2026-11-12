@@ -1,0 +1,11 @@
+# 訓練資料（含客戶資料，不上傳）
+regression8.csv
+
+# 根目錄舊版 HTML（交付版本在 dist/）
+/撥貸金額預測工具.html
+/撥貸金額(決策樹判斷).html
+/撥貸金額・決策樹判斷.html
+
+# Python / pytest 快取
+__pycache__/
+.pytest_cache/

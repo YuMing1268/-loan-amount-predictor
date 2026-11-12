@@ -1,0 +1,5 @@
+project-brief.md是本專案目標 ,撥貸金額預測工具.html 及 撥貸金額(決策樹判斷).html,是2項預期產生程式供使用,
+regression8.csv是信貸撥款資料,請依標準程式開發文件 如後02-prd.md、03-srs.md、04-sad.md、05-sds.md、06-test-plan.md
+依本專案實際執行修改文件內容 ,產生程式及驗證測試流程
+
+

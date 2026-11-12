@@ -1,0 +1,76 @@
+{
+  "trained_at": "2026-11-10 18:52",
+  "data": "regression8.csv",
+  "clean": {
+    "rows_in": 232499,
+    "duplicates_removed": 5921,
+    "invalid_target_removed": 0,
+    "rows_out": 226578
+  },
+  "seed": 42,
+  "test_size": 0.2,
+  "hgb_params": {
+    "max_iter": 400,
+    "learning_rate": 0.1,
+    "max_leaf_nodes": 31,
+    "min_samples_leaf": 20,
+    "early_stopping": false,
+    "random_state": 42
+  },
+  "tree_params": {
+    "max_depth": 4,
+    "min_samples_leaf": 200,
+    "random_state": 42
+  },
+  "dbr_bounds_final": [
+    1.13,
+    21.98
+  ],
+  "median_final": 40.0,
+  "cut_final": [
+    28.956922233750404,
+    50.0484642394008
+  ],
+  "holdout": {
+    "baseline_median": {
+      "MAE": 30.139,
+      "MedianAE": 20.0,
+      "RMSE": 47.435,
+      "R2": -0.0776,
+      "within_30pct": 0.2473
+    },
+    "hgb": {
+      "MAE": 18.578,
+      "MedianAE": 10.606,
+      "RMSE": 31.29,
+      "R2": 0.5311,
+      "within_30pct": 0.5198
+    },
+    "tree_leaf_median": {
+      "MAE": 22.356,
+      "MedianAE": 14.0,
+      "RMSE": 35.787,
+      "R2": 0.3866,
+      "within_30pct": 0.3888
+    }
+  },
+  "ablation": {
+    "removed": [
+      "無擔保總餘額",
+      "DBR",
+      "DBR_為0"
+    ],
+    "hgb_without": {
+      "MAE": 24.444,
+      "MedianAE": 14.993,
+      "RMSE": 38.208,
+      "R2": 0.3008,
+      "within_30pct": 0.3834
+    }
+  },
+  "gates": {
+    "hgb_mae_le_0.85_baseline": true,
+    "tree_mae_le_0.95_baseline": true
+  },
+  "seconds": 7.2
+}

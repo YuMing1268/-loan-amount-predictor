@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>撥貸金額・決策樹判斷</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2433;--mu:#667085;--bd:#e2e5ea;--ac:#2f6fed;--hi:#16794c;--lo:#b54708;--hib:#e3f4ea;--lob:#fdf0e1;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171c;--card:#1d222a;--tx:#e8ebf0;--mu:#9aa3b2;--bd:#2d343f;--ac:#6b9bff;--hi:#5fd09a;--lo:#f0a35e;--hib:#16372a;--lob:#3b2a14}}
+:root[data-theme="dark"]{--bg:#14171c;--card:#1d222a;--tx:#e8ebf0;--mu:#9aa3b2;--bd:#2d343f;--ac:#6b9bff;--hi:#5fd09a;--lo:#f0a35e;--hib:#16372a;--lob:#3b2a14}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 18px;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+.card h2{font-size:14px;margin:0 0 12px;color:var(--mu);font-weight:600}
+label{display:block;font-size:13px;margin:10px 0 4px}label small{color:var(--ac);margin-left:6px}label small.n{color:var(--mu)}
+select,input{width:100%;padding:9px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{margin-top:14px;padding:9px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;cursor:pointer}
+button.g{background:transparent;color:var(--mu);border:1px solid var(--bd);margin-left:8px}
+.big{font-size:38px;font-weight:700;line-height:1.1}.unit{font-size:14px;color:var(--mu);font-weight:400;margin-left:4px}
+.tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:600;margin-left:10px;vertical-align:middle}
+.tag.hi{background:var(--hib);color:var(--hi)}.tag.lo{background:var(--lob);color:var(--lo)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0;font-size:13px}.kv span:nth-child(odd){color:var(--mu)}
+ol.path{margin:8px 0 0;padding-left:20px;font-size:13px}ol.path li{margin:5px 0}ol.path em{font-style:normal;color:var(--mu)}
+.bar{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:var(--ac)}
+.note{color:var(--mu);font-size:12px;margin-top:14px}
+.numerr{color:#c0392b;font-size:13px;margin-top:10px}
+</style></head><body><main>
+<h1>撥貸金額・淺層決策樹判斷</h1>
+<p class="sub" id="sub"></p>
+<div class="grid">
+<div class="card"><h2>客戶條件</h2><div id="form"></div>
+<button id="go">判斷</button><button class="g" id="reset">範例／重設</button></div>
+<div class="card"><h2>判斷結果</h2><div id="out"><span class="sub">請在左側輸入條件後按「判斷」。</span></div></div>
+</div>
+<p class="note">預測值為該葉節點歷史撥貸金額的中位數，區間為 25%～75% 分位數。決策樹較簡單，精準度不及梯度提升樹，僅供初篩與向主管說明判斷理由使用。金額單位沿用原資料（假設為萬元）。</p>
+</main>
+<script>
+const M=/*__MODEL__*/null;
+const CATS={
+ "行業":{opts:["行業屬性A","行業屬性B","行業屬性C","行業屬性D","行業屬性E"],unk:"行業_未知"},
+ "學歷":{opts:["高中","專科","大學","碩士","博士"],unk:"學歷_未知"},
+ "居住":{opts:["住本人資產無貸款","住本人資產有貸款","住公司宿舍","住租賃","住親戚產業"],unk:"居住_未知"},
+ "婚姻":{opts:["婚姻未婚","婚姻已婚","婚姻已婚無子女","婚姻已婚有子女","婚姻其他"],unk:"婚姻_未知"}};
+const MAXV={DBR:22};const NUM=[["循環比","循環比（%）"],["信用卡循環金額","信用卡循環金額"],["無擔保總餘額","無擔保總餘額"],["預借現金次數","預借現金次數"],["信用貸款含現金卡家數","信用貸款含現金卡家數"],["DBR","DBR"]];
+
+/* ---- 純函式（與預測工具、src/features.py 相同的特徵規則） ---- */
+function toFeat(rec){const f={};M.cols.forEach(c=>f[c]=0);
+ for(const g in CATS){let hit=false;CATS[g].opts.forEach(o=>{if(parseFloat(rec[o])===1){f[o]=1;hit=true}});if(!hit)f[CATS[g].unk]=1}
+ NUM.forEach(([k])=>f[k]=parseFloat(rec[k])||0);
+ f["無擔保總餘額"]=Math.max(0,f["無擔保總餘額"]);f["DBR_為0"]=f["DBR"]===0?1:0;
+ f["DBR"]=Math.min(Math.max(f["DBR"],M.dbr[0]),M.dbr[1]);return f}
+function walk(f){let n=M.tree;const p=[];while(n.f){const left=f[n.f]<=n.t;p.push([n.f,n.t,left,f[n.f]]);n=left?n.l:n.r}return{leaf:n,path:p}}
+function judge(rec){const{leaf,path}=walk(toFeat(rec));return{leaf,path,hi:leaf.med>M.median}}
+const used=new Set();(function w(n){if(n.f){used.add(n.f);w(n.l);w(n.r)}})(M.tree);
+if(typeof module!=="undefined")module.exports={M,toFeat,walk,judge,used};
+
+/* ---- 畫面 ---- */
+if(typeof document!=="undefined"){
+const $=id=>document.getElementById(id);
+$("sub").textContent=`依據歷史資料（${M.n.toLocaleString()} 筆，${M.trained_at||""} 訓練）的深度 4 決策樹。輸入客戶條件，顯示預測金額與判斷路徑。`;
+const catUsed=g=>CATS[g].opts.concat([CATS[g].unk]).some(f=>used.has(f));
+const badge=u=>u?'<small>★ 決策樹有使用</small>':'<small class="n">此樹未使用</small>';
+let h="";for(const g in CATS){h+=`<label for="c_${g}">${g}屬性${badge(catUsed(g))}</label><select id="c_${g}"><option value="">未知／未填</option>`+CATS[g].opts.map(o=>`<option>${o}</option>`).join("")+"</select>"}
+h+='<div class="row2">'+NUM.map(([k,t])=>`<div><label for="n_${k}">${t}${badge(used.has(k)||(k=="DBR"&&used.has("DBR_為0")))}</label><input id="n_${k}" type="number" min="0"${k in MAXV?` max="${MAXV[k]}"`:""} step="any" value="0"></div>`).join("")+"</div>";
+$("form").innerHTML=h;
+function formRec(){const r={};for(const g in CATS){const v=$("c_"+g).value;if(v)r[v]=1}NUM.forEach(([k])=>r[k]=$("n_"+k).value);return r}
+const fmt=x=>Math.round(x*100)/100;
+function run(){const{leaf,path,hi}=judge(formRec());
+ const steps=path.map(([k,t,left,v])=>t===0.5?`<li>${k}：<b>${left?"否":"是"}</b></li>`:`<li>${k} <b>${left?"≤":">"} ${fmt(t)}</b> <em>（輸入 ${fmt(v)}）</em></li>`).join("");
+ $("out").innerHTML=`<div class="big">${fmt(leaf.med)}<span class="unit">預測金額</span><span class="tag ${hi?"hi":"lo"}">${hi?"偏高":"偏低"}</span></div>
+ <div class="kv"><span>常見區間</span><span>${fmt(leaf.p25)} ～ ${fmt(leaf.p75)}</span><span>群組平均</span><span>${leaf.mean}</span><span>群組筆數</span><span>${leaf.n.toLocaleString()}</span><span>高於全體中位數（${M.median}）占比</span><span>${(leaf.hi*100).toFixed(0)}%<div class="bar"><i style="width:${leaf.hi*100}%"></i></div></span></div>
+ <h2 style="margin-top:16px">判斷路徑</h2><ol class="path">${steps}</ol>`}
+function badNum(){const m=[];NUM.forEach(([k,t])=>{const e=$("n_"+k),v=parseFloat(e.value),b=v<0||v>(MAXV[k]??Infinity);e.style.borderColor=b?"#c0392b":"";e.style.background=b?"rgba(192,57,43,.08)":"";if(v<0)m.push(`${t} 不得小於 0`);else if(b)m.push(`${t} 不得大於 ${MAXV[k]}`)});return m}
+function safeRun(){const bad=badNum();if(bad.length){$("out").innerHTML=`<div class="numerr">${bad.join("；")}，請修正後再計算。</div>`;return}run()}
+$("go").onclick=safeRun;$("form").oninput=badNum;
+$("reset").onclick=()=>{for(const g in CATS)$("c_"+g).value=g=="行業"?"行業屬性C":"";NUM.forEach(([k])=>$("n_"+k).value=({DBR:12,無擔保總餘額:20,循環比:10})[k]||0);safeRun()};
+}
+</script></body></html>

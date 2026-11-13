@@ -9,6 +9,10 @@
 
 ## 元件與資料流
 
+![元件與資料流：離線訓練產生 dist/*.html，發布到使用者瀏覽器](img/architecture.png)
+
+<details><summary>Mermaid 原始碼（修改後請重新產生 img/architecture.png）</summary>
+
 ```mermaid
 flowchart TB
   subgraph OFF["離線訓練（維護者電腦）"]
@@ -27,6 +31,8 @@ flowchart TB
   DIST -->|"發布"| P
   DIST -->|"發布"| Q
 ```
+
+</details>
 
 資料流：訓練資料只出現在維護者的電腦上。`features.py` 負責欄位驗證（FR-01）與清理（FR-02）。`train.py` 計算界線、訓練、評估，並把模型參數以 JSON 的形式嵌入 HTML 範本。使用者端的輸入在瀏覽器中由 `toFeat` 正規化（FR-04）。錯誤直接顯示在畫面上，不會有任何資料送出去。
 
